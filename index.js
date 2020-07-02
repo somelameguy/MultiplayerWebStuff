@@ -123,6 +123,7 @@ io.on('connection',(socket) => {
 
 });
 
-http.listen(7777, () => {
-  console.log('listening on *:7777');
+const port = process.argv[2] || 7777;
+http.listen(port, () => {
+  console.log('listening on *:' + port);
 });
