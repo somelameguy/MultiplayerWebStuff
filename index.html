@@ -14,11 +14,13 @@
     </style>
   </head>
 
-<script src="/socket.io/socket.io.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.0/socket.io.js"></script>
+<script type="text/javascript" src="/bariobare.js"></script>
 <script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
   <script>
-  $(function () {
-    var socket = io();
+
+  function initialize(socketURL) {
+    var socket = socketURL ? io(socketURL) : io();
     var canv = document.getElementById("myCanvas");
     var ctx = canv.getContext("2d");
     //Load sounds
@@ -223,8 +225,27 @@
 
     update();
 
-  });
+  };
 
+  // Initialization
+  $(function() {
+    if (typeof bariobare !== 'undefined') {
+      // Initialize using the bario-bare socket URL, if
+      // the bario-bare library is loaded
+      bariobare.getGameURL()
+        .then(function(socketURL) {
+          initialize(socketURL);
+        })
+        .catch(function(error) {
+          console.log(error);
+        })
+    }
+    else {
+      // If the bario-bare library isn't loaded, initialize
+      // with the default socket URL.
+      initialize();
+    }
+  });
 
   </script>
 
