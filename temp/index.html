@@ -1,0 +1,207 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Socket.IO chat</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { font: 13px Helvetica, Arial; }
+      form { background: #000; padding: 3px; position: fixed; bottom: 0; width: 100%; }
+      form input { border: 0; padding: 10px; width: 90%; margin-right: 0.5%; }
+      form button { width: 9%; background: rgb(130, 224, 255); border: none; padding: 10px; }
+      #messages { list-style-type: none; margin: 0; padding: 0; }
+      #messages li { padding: 5px 10px; }
+      #messages li:nth-child(odd) { background: #eee; }
+    </style>
+  </head>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
+  <script>
+  $(function () {
+    var socket = io();
+    var canv = document.getElementById("myCanvas");
+    var ctx = canv.getContext("2d");
+
+    //Load images
+    var charWidth=100;
+    var charHeight=100;
+    var characterStand=new Image;
+    var characterTeabag=new Image;
+    var characterWalk1=new Image;
+    var characterWalk2=new Image;
+    var oldmanStand=new Image;
+    var oldmanHit=new Image;
+    var oldmanDown=new Image;
+
+    var spriteArray = new Array();
+    characterStand.src="sprites/stand.png"; //0
+    characterTeabag.src="sprites/teabag.png"; //1
+    characterWalk1.src="sprites/walk1.png"; //2 
+    characterWalk2.src="sprites/walk2.png"; //3
+    oldmanStand.src="sprites/oldman1.png"; //4
+    oldmanHit.src="sprites/oldman2.png"; //5
+    oldmanDown.src="sprites/oldman3.png"; //6
+
+    spriteArray[0]=characterStand;
+    spriteArray[1]=characterTeabag;
+    spriteArray[2]=characterWalk1;
+    spriteArray[3]=characterWalk2;
+    spriteArray[4]=oldmanStand;
+    spriteArray[5]=oldmanHit;
+    spriteArray[6]=oldmanDown;
+
+
+    let thisPlayer = {
+      id: socket.id,
+      key: null,
+      color: randColor(),
+      xPos:200,
+      yPos:200,
+      xVel:0,
+      yVel:0,
+      speed:2,
+      friction:0.80,
+      sprite:0
+    }
+
+    setTimeout(function(){
+      console.log(socket.id);
+    }, 2000);
+
+    console.log(socket.id);
+
+    let players = [];
+
+    $('form').submit(function(e) {
+      e.preventDefault(); // prevents page reloading
+      socket.emit('chat message', $('#m').val());
+      $('#m').val('');
+      return false;
+    });
+
+    socket.on ('updateClients', function(playerListFromServer,actorListFromServer){
+      myPlayerList=playerListFromServer;
+      myActorList=actorListFromServer;     
+      // Clear screen and draw every player based on server's info on all players
+      ctx.clearRect(0,0,canv.width,canv.height);
+      myPlayerList.forEach(player => {
+        draw(player);
+      })
+      //Draw actors too
+      // myActorList.forEach(actor =>{
+      //   draw(actor);
+      // })
+    })
+
+    function update(){
+      if (thisPlayer.id===undefined){
+        thisPlayer.id=socket.id;
+        return;
+      }
+
+          //Left arrow
+      if (thisPlayer.key == 37){
+        if (thisPlayer.xVel>-thisPlayer.speed){
+          thisPlayer.xVel--;
+          thisPlayer.sprite=3;
+        }
+      }
+
+      //Up arrow
+      // if (thisPlayer.key == 38){
+      //  thisPlayer.yPos--;
+      // }
+
+      //Right arrow
+      else if (thisPlayer.key == 39){
+        if (thisPlayer.xVel<thisPlayer.speed){
+          thisPlayer.xVel++;
+          thisPlayer.sprite=2;
+        }
+      }
+      //Down arrow
+      else if (thisPlayer.key == 40){
+       thisPlayer.sprite=1;
+      }
+      else{
+        thisPlayer.sprite=0;
+      }
+
+      thisPlayer.xVel*=thisPlayer.friction;
+      thisPlayer.xPos+= thisPlayer.xVel;
+      socket.emit("update", thisPlayer);
+
+      window.requestAnimationFrame( update );
+    }
+
+    function draw (playerFromServer){
+      // ctx.beginPath();
+      // ctx.strokeStyle = playerFromServer.color;
+      // ctx.arc(playerFromServer.xPos,playerFromServer.yPos,30,0,2*Math.PI);
+      // ctx.stroke();
+      ctx.drawImage(spriteArray[playerFromServer.sprite],playerFromServer.xPos,playerFromServer.yPos);
+    }
+
+    function randColor(){
+    var colorNum = ['0','1',"2","3","4","5","6","7","8","9","A","B","C","D","E","F"];
+    var color = "#";
+    for(var i = 0; i < 6 ; i++){
+        color = color + colorNum[Math.floor(Math.random()*16)];
+    }
+    return color;
+  }
+  document.addEventListener("keyup", (event) => {
+      if (thisPlayer.id===undefined){
+        thisPlayer.id=socket.id;
+        return;
+      }
+      thisPlayer.key=null;
+      socket.emit('key press',thisPlayer);
+  });
+
+    document.addEventListener("keydown", (event) => {
+      if (thisPlayer.id===undefined){
+        thisPlayer.id=socket.id;
+        return;
+      }
+      thisPlayer.key=event.keyCode;
+
+      // //Left arrow
+      // if (event.keyCode == 37){
+      //  thisPlayer.xVel--;
+      // }
+      // //Up arrow
+      // if (event.keyCode == 38){
+      //  thisPlayer.yPos--;
+      // }
+      // //Right arrow
+      // if (event.keyCode == 39){
+      //  thisPlayer.xVel++;
+      // }
+      // //Down arrow
+      // else if (event.keyCode == 40){
+      //  thisPlayer.yPos++;
+      // }
+
+      // thisPlayer.xVel*=thisPlayer.friction;
+      // thisPlayer.xPos+= thisPlayer.xVel;
+      socket.emit('key press',thisPlayer);
+    });
+
+    update();
+
+  });
+
+
+  </script>
+  
+  <canvas id="myCanvas" width="400" height="400" style="border:1px solid #000000;">
+  
+  </canvas>
+  
+  <body>
+    <ul id="messages"></ul>
+    <p id="inputs"> CONTENT </p>
+
+  </body>
+</html>
