@@ -16,12 +16,16 @@ let grandpa = {
   id:"grandpa",
   health:3,
   xPos:200,
-  yPos:200,
+  yPos:250,
+  xVel:0,
+  yVel:0,
   sprite:4,
   width:20,
   height:80,
   active:true,
-  speed:0.05
+  speed:0.05,
+//  maxSpeed:2,
+  friction:0.80
 }
 
 actors.push(grandpa);
@@ -69,6 +73,15 @@ io.on('connection',(socket) => {
       players[cPlayerIndex] = updatePlayer;
     }
 
+    //Old man movement logic
+    
+    // If old man isn't moving to the right, do so
+    // if (actors[0].speed<0.05){
+    //   actors[0].speed=0.05;
+    // }
+
+    actors[0].xVel*= actors[0].friction;
+    actors[0].xPos+=actors[0].xVel;
     actors[0].xPos+=actors[0].speed;
 
     io.emit('updateClients',players,actors);
@@ -85,12 +98,37 @@ io.on('connection',(socket) => {
         }
 	});
 
+  socket.on('key up', (player) => {
+    // When a client presses a key, take the player object and update server's array of player info
+    let currentPlayerIndex = findPlayerIndex(player);
+        if (currentPlayerIndex == -1) {
+            players.push(player);
+        }
+        else{
+            players[currentPlayerIndex] = player;
+        }
+  });
+
   //Collision function for grandpa
   socket.on('grandpa',(aggressivePlayer)=>{
     var ind=findActorIndex(grandpa);
+    var playerInd=findPlayerIndex(aggressivePlayer);
+    //check if player is performing the helping action or not
+    if (players[playerInd].playerAction){
+      // add player velocity to grandpa
+      actors[ind].xVel+=(players[playerInd].xVel);
+      // restrict players from detaching from gramps unless they let go
+      // if (players[playerInd].xPos>actors[ind].xPos-actors[ind].width-players[playerInd].width){
+      //   console.log("doing the restricting");
+      //   players[playerInd].encumbered=true;
+      //   io.emit('updateClients',players,actors);
+      // }
 
+
+    }
+    else{
     // check if grandpa is ready to be smacked
-    if(actors[ind].active){
+    if(actors[ind].active && !players[playerInd].playerAction){
       //deactivate grandpa to process one smack at a time
       actors[ind].active=false;
       actors[ind].health--;
@@ -118,6 +156,7 @@ io.on('connection',(socket) => {
       }
 
     }
+  }
 
   });
 

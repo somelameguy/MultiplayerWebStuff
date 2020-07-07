@@ -11,6 +11,15 @@
       #messages { list-style-type: none; margin: 0; padding: 0; }
       #messages li { padding: 5px 10px; }
       #messages li:nth-child(odd) { background: #eee; }
+      canvas {
+    padding-left: 0;
+    padding-right: 0;
+    margin-left: auto;
+    margin-right: auto;
+    display: block;
+    width: 600px;
+}
+
     </style>
   </head>
 
@@ -37,6 +46,8 @@
     var oldmanStand=new Image;
     var oldmanHit=new Image;
     var oldmanDown=new Image;
+    var backgroundImage=new Image;
+    var characterAction=new Image;
 
     var spriteArray = new Array();
     characterStand.src="sprites/stand.png"; //0
@@ -46,6 +57,8 @@
     oldmanStand.src="sprites/oldman1.png"; //4
     oldmanHit.src="sprites/oldman2.png"; //5
     oldmanDown.src="sprites/oldman3.png"; //6
+    backgroundImage.src="sprites/crosswalk.png"; //7
+    characterAction.src="sprites/action.png" //8
 
     spriteArray[0]=characterStand;
     spriteArray[1]=characterTeabag;
@@ -54,6 +67,8 @@
     spriteArray[4]=oldmanStand;
     spriteArray[5]=oldmanHit;
     spriteArray[6]=oldmanDown;
+    spriteArray[7]=backgroundImage;
+    spriteArray[8]=characterAction;
 
 
     //Define player
@@ -62,14 +77,16 @@
       key: null,
       color: randColor(),
       xPos:50,
-      yPos:200,
+      yPos:250,
       xVel:0,
       yVel:0,
       speed:2,
       friction:0.80,
       sprite:0,
       width:50,
-      height:100
+      height:100,
+      playerAction:false,
+      encumbered:false
     }
 
     setTimeout(function(){
@@ -109,25 +126,35 @@
         thisPlayer.id=socket.id;
         return;
       }
+            //Up arrow
+      if (thisPlayer.key == 38){
+        thisPlayer.playerAction=true;
+        thisPlayer.sprite=8;
+      }
 
           //Left arrow
       if (thisPlayer.key == 37){
         if (thisPlayer.xVel>-thisPlayer.speed){
           thisPlayer.xVel--;
-          thisPlayer.sprite=3;
+          if (thisPlayer.playerAction){
+            thisPlayer.sprite=8;
+          }
+          else{
+            thisPlayer.sprite=3;
+          }
         }
       }
-
-      //Up arrow
-      // if (thisPlayer.key == 38){
-      //  thisPlayer.yPos--;
-      // }
 
       //Right arrow
       else if (thisPlayer.key == 39){
         if (thisPlayer.xVel<thisPlayer.speed){
           thisPlayer.xVel++;
-          thisPlayer.sprite=2;
+          if (thisPlayer.playerAction){
+            thisPlayer.sprite=8;
+          }
+          else{
+            thisPlayer.sprite=2;
+          }
         }
       }
       //Down arrow
@@ -135,19 +162,37 @@
        thisPlayer.sprite=1;
       }
       else{
-        thisPlayer.sprite=0;
+        if(!thisPlayer.playerAction){
+          thisPlayer.sprite=0;
+
+        }
+
       }
+
 
       thisPlayer.xVel*=thisPlayer.friction;
-      thisPlayer.xPos+= thisPlayer.xVel;
+      thisPlayer.xPos+=thisPlayer.xVel;
       socket.emit("update", thisPlayer);
 
+      // Detect collisions here
       if(actors.length>0){
-        detectCollision(thisPlayer,actors[0])
+        //Player vs Grandpa
+        detectCollision(thisPlayer,actors[0]);
+
+        if (thisPlayer.xPos>actors[0].xPos-actors[0].width-thisPlayer.width && thisPlayer.playerAction&& thisPlayer.xPos<actors[0].xPos+actors[0].width+thisPlayer.width){
+          console.log("Limit movement");
+          thisPlayer.speed=1;
+        }
+        else{
+          thisPlayer.speed=2;
+        }
       }
+
+      console.log(thisPlayer.playerAction);
 
       //clear screen and draw things
       ctx.clearRect(0,0,canv.width,canv.height);
+      ctx.drawImage(spriteArray[7],0,0);
       players.forEach(player => {
         draw(player);
       })
@@ -162,7 +207,8 @@
 
     function detectCollision(selfPlayer, collidedObject){
       if (selfPlayer.xPos<collidedObject.xPos+collidedObject.width && selfPlayer.xPos+selfPlayer.width>collidedObject.xPos && selfPlayer.yPos<collidedObject.yPos+collidedObject.height && selfPlayer.yPos+selfPlayer.height>collidedObject.yPos){
-
+        
+        // Collided Object ID is passed as the emit name so I just need to write new server code
         socket.emit(collidedObject.id,selfPlayer);
       }
     }
@@ -200,27 +246,20 @@
         return;
       }
       thisPlayer.key=event.keyCode;
-
-      // //Left arrow
-      // if (event.keyCode == 37){
-      //  thisPlayer.xVel--;
-      // }
-      // //Up arrow
-      // if (event.keyCode == 38){
-      //  thisPlayer.yPos--;
-      // }
-      // //Right arrow
-      // if (event.keyCode == 39){
-      //  thisPlayer.xVel++;
-      // }
-      // //Down arrow
-      // else if (event.keyCode == 40){
-      //  thisPlayer.yPos++;
-      // }
-
-      // thisPlayer.xVel*=thisPlayer.friction;
-      // thisPlayer.xPos+= thisPlayer.xVel;
       socket.emit('key press',thisPlayer);
+    });
+
+    document.addEventListener("keyup", event => {
+      if (thisPlayer.id===undefined){
+        thisPlayer.id=socket.id;
+        return;
+      }
+      if (event.keyCode === 38){
+        thisPlayer.playerAction=false;
+        socket.emit('key up',thisPlayer);
+
+      }
+
     });
 
     update();
@@ -249,7 +288,7 @@
 
   </script>
 
-  <canvas id="myCanvas" width="400" height="400" style="border:1px solid #000000;">
+  <canvas id="myCanvas" width="600" height="400" style="border:1px solid #000000;">
 
   </canvas>
 
