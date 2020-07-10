@@ -32,9 +32,14 @@
     var socket = socketURL ? io(socketURL) : io();
     var canv = document.getElementById("myCanvas");
     var ctx = canv.getContext("2d");
+    var gameFinished=false;
+    var yayEnd=false;
+    var endingyPos=-100;
+    var ending1_2Var=false;
     //Load sounds
     var smack=new Audio('sounds/smack.wav');
     var thud=new Audio('sounds/thud.wav');
+    var victory=new Audio('sounds/victory.wav');
 
     //Load images
     var charWidth=100;
@@ -48,6 +53,24 @@
     var oldmanDown=new Image;
     var backgroundImage=new Image;
     var characterAction=new Image;
+
+    //Ending Images. This one holds the final calculated image.
+    var thisEnding= new Image;
+
+    //Ending for not doing anything
+    var ending1=new Image;
+    ending1.src="sprites/youdidit.png";
+    var ending1_2=new Image;
+    ending1_2.src="sprites/part2.png";
+    //Ending for pushing grandpa across
+    var ending2=new Image;
+    ending2.src="sprites/aggressive.png";
+    //Ending for pushing grandpa backwards
+    var ending3=new Image;
+    ending3.src="sprites/maybe.png";
+    //Ending for grandpa collapse
+    var ending4=new Image;
+    ending4.src="sprites/oops.png";
 
     var spriteArray = new Array();
     characterStand.src="sprites/stand.png"; //0
@@ -75,6 +98,7 @@
     let thisPlayer = {
       id: socket.id,
       key: null,
+      actionKey: null, // This is a separate key from movement since it needs to work while moving.
       color: randColor(),
       xPos:50,
       yPos:250,
@@ -104,19 +128,47 @@
       return false;
     });
 
+    // Keeps local list of actors and players in sync with server
     socket.on ('updateClients', function(playerListFromServer,actorListFromServer){
       players=playerListFromServer;
       actors=actorListFromServer;
-    })
+    });
 
     socket.on('playSound', function(soundbit){
-      if(soundbit==="smack"){
+      if(soundbit==="victory"){
+        victory.play();
+      }
+      else if(soundbit==="smack"){
         smack.play();
       }
       else if(soundbit==="thud"){
         thud.play();
       }
-    })
+    });
+
+    socket.on('showEnd',function(endNumber){
+
+    if(endNumber==0){
+      console.log("GAME END 1");
+      thisEnding= ending1;
+    }
+    else if(endNumber==1){
+      console.log("GAME END 2");
+      thisEnding= ending2;
+    }
+    else if(endNumber==2){
+      console.log("GAME END 3");
+      thisEnding= ending3;
+    }
+    else if(endNumber==3){
+      console.log("GAME END 4");
+      thisEnding= ending4;
+    }
+
+    setTimeout(function(){
+        yayEnd=true;
+        }, 1000);
+    });
 
     function update(){
 
@@ -127,7 +179,7 @@
         return;
       }
             //Up arrow
-      if (thisPlayer.key == 38){
+      if (thisPlayer.actionKey == true){
         thisPlayer.playerAction=true;
         thisPlayer.sprite=8;
       }
@@ -179,16 +231,36 @@
         //Player vs Grandpa
         detectCollision(thisPlayer,actors[0]);
 
+        //Limit player speed when pushing grandpa.
         if (thisPlayer.xPos>actors[0].xPos-actors[0].width-thisPlayer.width && thisPlayer.playerAction&& thisPlayer.xPos<actors[0].xPos+actors[0].width+thisPlayer.width){
-          console.log("Limit movement");
           thisPlayer.speed=1;
         }
         else{
           thisPlayer.speed=2;
         }
-      }
 
-      console.log(thisPlayer.playerAction);
+      if(!gameFinished){
+        // If grandpa makes it across, game ends
+        if(actors[0].xPos>500){
+          //No interference with grandpa has special ending
+          console.log(actors[0].pushed);
+          if(actors[0].pushed<1){
+            socket.emit("endGame",0);
+                    gameFinished=true;
+          }
+          // Otherwise, generic success cross
+          else {
+            socket.emit("endGame",1);
+                    gameFinished=true;
+          }
+        }
+        // If grandpa was shoved backwards to the start
+        else if(actors[0].xPos<0){
+          socket.emit("endGame",2);
+                  gameFinished=true;
+        }
+      }
+      }
 
       //clear screen and draw things
       ctx.clearRect(0,0,canv.width,canv.height);
@@ -199,6 +271,26 @@
       actors.forEach(actor => {
         draw(actor);
       })
+
+      // do the ending animation
+      if(yayEnd){
+        ctx.drawImage(thisEnding,200, endingyPos);
+        if (endingyPos<50){
+          endingyPos++;
+        }
+
+      setTimeout(function(){
+        if(thisEnding== ending1){
+          ending1_2Var=true;
+        }
+      }, 5000);
+
+      if (ending1_2Var){
+        ctx.drawImage(ending1_2,200, endingyPos+100);
+      }
+
+
+      }
     }
 
     function draw (playerFromServer){
@@ -236,7 +328,14 @@
         thisPlayer.id=socket.id;
         return;
       }
-      thisPlayer.key=null;
+      if (event.keyCode==38){
+        //this lets you use the action key while moving
+        thisPlayer.actionKey=false;
+      }
+      else{
+        //this stops the previous action on key up
+        thisPlayer.key=null;
+      }
       socket.emit('key press',thisPlayer);
   });
 
@@ -245,7 +344,12 @@
         thisPlayer.id=socket.id;
         return;
       }
-      thisPlayer.key=event.keyCode;
+      if (event.keyCode==38){
+        thisPlayer.actionKey=true;
+      }
+      else{
+        thisPlayer.key=event.keyCode;
+      }
       socket.emit('key press',thisPlayer);
     });
 

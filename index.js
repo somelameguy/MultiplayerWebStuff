@@ -24,8 +24,8 @@ let grandpa = {
   height:80,
   active:true,
   speed:0.05,
-//  maxSpeed:2,
-  friction:0.80
+  friction:0.80,
+  pushed:0
 }
 
 actors.push(grandpa);
@@ -109,21 +109,42 @@ io.on('connection',(socket) => {
         }
   });
 
+  // Resolve finish condition. 
+  socket.on('endGame',(result)=>{
+    // Stop further interactions with grandpa
+    var ind=findActorIndex(grandpa);
+    actors[ind].active=false;
+    actors[ind].speed=0;
+    console.log("ending was reached");
+    // Process result
+
+    setTimeout(function(){
+    io.emit('playSound',"victory");
+        }, 1000);
+    io.emit('showEnd', result);
+  });
+
   //Collision function for grandpa
   socket.on('grandpa',(aggressivePlayer)=>{
     var ind=findActorIndex(grandpa);
     var playerInd=findPlayerIndex(aggressivePlayer);
-    //check if player is performing the helping action or not
-    if (players[playerInd].playerAction){
-      // add player velocity to grandpa
+    //check if player is performing the helping action or not, and if grandpa is active
+    if (players[playerInd].playerAction && actors[ind].active){
+      actors[ind].pushed++;
+      console.log(actors[ind].pushed);
       actors[ind].xVel+=(players[playerInd].xVel);
-      // restrict players from detaching from gramps unless they let go
-      // if (players[playerInd].xPos>actors[ind].xPos-actors[ind].width-players[playerInd].width){
-      //   console.log("doing the restricting");
-      //   players[playerInd].encumbered=true;
-      //   io.emit('updateClients',players,actors);
-      // }
-
+      // Old man dies if pushed too much
+      if(actors[ind].pushed>200){
+        setTimeout(function(){
+          io.emit('playSound',"thud");
+          actors[ind].speed=0;
+          actors[ind].sprite=6;
+        }, 1000);
+        setTimeout(function(){
+          io.emit('playSound',"victory");
+          io.emit('showEnd', 3);
+        },4000);
+      }
 
     }
     else{
@@ -148,11 +169,17 @@ io.on('connection',(socket) => {
         }, 2000);
       }
       else{
+        // the old man died
         setTimeout(function(){
           io.emit('playSound',"thud");
           actors[ind].speed=0;
           actors[ind].sprite=6;
         }, 1000);
+        setTimeout(function(){
+          io.emit('playSound',"victory");
+          io.emit('showEnd', 3);
+        },4000);
+
       }
 
     }
